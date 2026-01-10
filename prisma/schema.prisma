@@ -1,0 +1,50 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  roomId    String
+  room      Room     @relation(fields: [roomId], references: [id])
+  completions Completion[]
+  createdAt DateTime @default(now())
+}
+
+model Room {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  users     User[]
+  tasks     Task[]
+  createdAt DateTime @default(now())
+}
+
+model Task {
+  id          String       @id @default(uuid())
+  content     String
+  roomId      String
+  room        Room         @relation(fields: [roomId], references: [id])
+  isGlobal    Boolean      @default(true)
+  completions Completion[]
+  createdAt   DateTime     @default(now())
+}
+
+model Completion {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id])
+  date      String   // YYYY-MM-DD
+  createdAt DateTime @default(now())
+
+  @@unique([userId, taskId, date])
+}
