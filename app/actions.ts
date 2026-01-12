@@ -8,15 +8,26 @@ import { redirect } from 'next/navigation'
 
 // --- Auth & Room ---
 
-export async function loginOrJoin(formData: FormData) {
-    const name = formData.get('name') as string
-    const roomCode = formData.get('roomCode') as string
+// --- Auth & Room ---
+// Strict access control: Only Keqing and Winter allowed.
 
-    if (!name || !roomCode) {
-        throw new Error('Name and Room Code are required')
+function verifyCredentials(name: string): boolean {
+    const normalized = name.trim().toLowerCase()
+    return normalized === 'keqing' || normalized === 'winter'
+}
+
+export async function login(name: string) {
+    // 1. Strict Auth Check
+    if (!verifyCredentials(name)) {
+        return { success: false, error: 'Access Denied: Restricted to Keqing and Winter' }
     }
 
-    // Find or create room
+    // 2. Auto-Assign Room based on Name
+    // Keqing -> Room "KEQING", Winter -> Room "WINTER"
+    const normalizedName = name.trim() // Keep display casing
+    const roomCode = normalizedName.toUpperCase()
+
+    // 3. Ensure Room Exists
     let room = await prisma.room.findUnique({
         where: { code: roomCode },
     })
@@ -27,26 +38,22 @@ export async function loginOrJoin(formData: FormData) {
         })
     }
 
-    // Create user linked to room
-    // Simple "Auth": We just create a new user record for this session
-    // To keep it persistent, we could try to find by name, but 
-    // instructions imply "login to shared space", name might be reused.
-    // We will simple create a user and set a cookie.
-
-    const user = await prisma.user.create({
-        data: {
-            name: name,
-            roomId: room.id,
-        },
+    // 4. Ensure User Exists in that Room
+    let user = await prisma.user.findFirst({
+        where: { name: normalizedName, roomId: room.id }
     })
 
+    if (!user) {
+        user = await prisma.user.create({
+            data: { name: normalizedName, roomId: room.id }
+        })
+    }
+
+    // 5. Set Session
     const cookieStore = await cookies()
     cookieStore.set('userId', user.id)
     cookieStore.set('roomId', room.id)
-
-    // No redirect, just revalidate path to trigger page reload state
-    revalidatePath('/')
-    // return { userId: user.id, roomId: room.id }
+    return { success: true }
 }
 
 export async function getCurrentUser() {
