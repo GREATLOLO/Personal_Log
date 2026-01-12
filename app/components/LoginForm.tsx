@@ -43,7 +43,7 @@ export default function LoginForm() {
                 <div>
                     <input
                         type="text"
-                        placeholder="Name (e.g. Keqing)"
+                        placeholder="Name"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         className="w-full px-4 py-3 rounded-xl glass-input text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
