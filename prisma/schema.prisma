@@ -14,7 +14,7 @@ datasource db {
 model DailyPlan {
   id        String   @id @default(uuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   date      String   // YYYY-MM-DD
   content   String   // Text content
   createdAt DateTime @default(now())
@@ -27,7 +27,7 @@ model User {
   id        String   @id @default(uuid())
   name      String
   roomId    String
-  room      Room     @relation(fields: [roomId], references: [id])
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
   completions Completion[]
   dailyPlans DailyPlan[]
   createdAt DateTime @default(now())
@@ -45,7 +45,7 @@ model Task {
   id          String       @id @default(uuid())
   content     String
   roomId      String
-  room        Room         @relation(fields: [roomId], references: [id])
+  room        Room         @relation(fields: [roomId], references: [id], onDelete: Cascade)
   isGlobal    Boolean      @default(true)
   completions Completion[]
   createdAt   DateTime     @default(now())
@@ -54,9 +54,9 @@ model Task {
 model Completion {
   id        String   @id @default(uuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   taskId    String
-  task      Task     @relation(fields: [taskId], references: [id])
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   date      String   // YYYY-MM-DD
   createdAt DateTime @default(now())
 
