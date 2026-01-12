@@ -1,36 +1,99 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Personal Log - Professional Workspace
 
-## Getting Started
+A high-performance, private workspace designed for daily planning, task tracking, and historical logging. Built with **Next.js 15**, **Prisma**, and **Postgres**, this application provides a sleek, shared environment for verified users.
 
-First, run the development server:
+## ✨ Core Features
+
+- **Secure Workspace Access**: Hardcoded verification system restricted to authorized personnel ("Keqing" and "Winter").
+- **Dynamic Task Management**: Create, delete, and track tasks with real-time status updates.
+- **Daily Planning**: Dedicated sections for daily objectives and long-term planning.
+- **Historical Records**: Automated archiving of daily logs and task completions for easy review.
+- **Premium UI/UX**: Modern aesthetics featuring glassmorphism, smooth animations, and a responsive layout.
+- **Multi-Room Architecture**: Automatic workspace assignment based on the user's identity.
+
+## 🛠️ Tech Stack
+
+- **Framework**: [Next.js](https://nextjs.org/) (App Router)
+- **Database**: [Postgres](https://www.postgresql.org/)
+- **ORM**: [Prisma](https://www.prisma.io/)
+- **Styling**: Vanilla CSS & Tailwind CSS
+- **Icons**: [Lucide React](https://lucide.dev/)
+- **Verification**: Name-based hardcoded verification
+
+## 🚀 Getting Started
+
+### 1. Prerequisites
+
+- Node.js 20+ installed
+- A running Postgres database (e.g., Vercel Postgres)
+
+### 2. Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/GREATLOLO/Personal_Log.git
+cd Personal_Log
+
+# Install dependencies
+npm install
+```
+
+### 3. Environment Configuration
+
+Create a `.env` or `.env.local` file in the root directory:
+
+```dotenv
+# Prisma connection pooling (recommended for app)
+DATABASE_URL="prisma+postgres://accelerate.prisma-data.net/?api_key=your_key"
+
+# Direct connection (required for migrations and db push)
+DIRECT_URL="postgres://user:pass@host:5432/db"
+```
+
+### 4. Database Setup
+
+```bash
+# Generate Prisma client
+npx prisma generate
+
+# Synchronize schema with database
+npx prisma db push
+
+# (Optional) Seed initial data
+npx tsx prisma/seed.ts
+```
+
+### 5. Running Localy
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The application will be available at [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## ☁️ Vercel Deployment
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+This project is optimized for deployment on **Vercel**.
 
-## Learn More
+### Deployment Steps
 
-To learn more about Next.js, take a look at the following resources:
+1. Connect your repository to Vercel.
+2. In the **Project Settings -> Environment Variables**, add:
+   - `DATABASE_URL`: Your pooled database URL.
+   - `DIRECT_URL`: Your direct database URL.
+3. Vercel will automatically run `next build`, which includes the Prisma client generation.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Optimization Tips
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Use **Prisma Accelerate** for connection pooling, especially in serverless environments.
+- Ensure your Postgres instance is in the same region as your Vercel deployment for minimal latency.
 
-## Deploy on Vercel
+## 📝 Usage
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. **Login**: Enter your authorized name ("Keqing" or "Winter"). No password is required.
+2. **Dashboard**: Navigate your daily tasks and plans.
+3. **History**: Access the sidebar or navigation to view past logs and completed objectives.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+Built with pride for high-productivity logging.
