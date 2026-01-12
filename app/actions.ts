@@ -182,3 +182,34 @@ export async function getHistoryDates(roomId: string) {
         .map((c: { date: string }) => c.date)
         .filter((date: string) => date !== today)
 }
+
+// --- Daily Plan ---
+
+export async function getDailyPlan(userId: string, date: string) {
+    return prisma.dailyPlan.findUnique({
+        where: {
+            userId_date: {
+                userId,
+                date
+            }
+        }
+    })
+}
+
+export async function saveDailyPlan(userId: string, date: string, content: string) {
+    await prisma.dailyPlan.upsert({
+        where: {
+            userId_date: {
+                userId,
+                date
+            }
+        },
+        update: { content },
+        create: {
+            userId,
+            date,
+            content
+        }
+    })
+    revalidatePath('/')
+}

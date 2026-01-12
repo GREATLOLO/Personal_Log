@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { TaskItem } from './TaskItem'
 import { LogView } from './LogView'
-import { createTask, getHistoryDates, getDailyLog, logout } from '@/app/actions'
-import { Plus, Notebook, ListTodo, History, ArrowLeft, LogOut } from 'lucide-react'
+import { createTask, getHistoryDates, getDailyLog, logout, getDailyPlan, saveDailyPlan } from '@/app/actions'
+import { Plus, Notebook, ListTodo, History, ArrowLeft, LogOut, CalendarPlus } from 'lucide-react'
 import { clsx } from 'clsx'
 
 type User = {
@@ -46,7 +46,7 @@ interface WorkspaceProps {
 
 export default function Workspace({ initialRoom, currentUser, todayLog }: WorkspaceProps) {
     const router = useRouter()
-    const [activeTab, setActiveTab] = useState<'tasks' | 'log' | 'history'>('tasks')
+    const [activeTab, setActiveTab] = useState<'tasks' | 'log' | 'history' | 'plan'>('tasks')
     const [newTaskContent, setNewTaskContent] = useState('')
     const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -55,6 +55,9 @@ export default function Workspace({ initialRoom, currentUser, todayLog }: Worksp
     const [selectedHistoryDate, setSelectedHistoryDate] = useState<string | null>(null)
     const [historyLog, setHistoryLog] = useState<DailyLogUser[]>([])
     const [loadingHistory, setLoadingHistory] = useState(false)
+    const [planContent, setPlanContent] = useState('')
+    const [loadingPlan, setLoadingPlan] = useState(false)
+    const [savingPlan, setSavingPlan] = useState(false)
 
     // Polling for updates
     useEffect(() => {
@@ -71,7 +74,33 @@ export default function Workspace({ initialRoom, currentUser, todayLog }: Worksp
         if (activeTab === 'history' && !selectedHistoryDate) {
             getHistoryDates(initialRoom.id).then(setHistoryDates)
         }
-    }, [activeTab, initialRoom.id, selectedHistoryDate])
+        if (activeTab === 'plan') {
+            const tomorrow = new Date()
+            tomorrow.setDate(tomorrow.getDate() + 1)
+            const dateStr = tomorrow.toISOString().split('T')[0]
+
+            setLoadingPlan(true)
+            getDailyPlan(currentUser.id, dateStr).then(plan => {
+                setPlanContent(plan?.content || '')
+                setLoadingPlan(false)
+            })
+        }
+    }, [activeTab, initialRoom.id, selectedHistoryDate, currentUser.id])
+
+    const handleSavePlan = async () => {
+        setSavingPlan(true)
+        try {
+            const tomorrow = new Date()
+            tomorrow.setDate(tomorrow.getDate() + 1)
+            const dateStr = tomorrow.toISOString().split('T')[0]
+
+            await saveDailyPlan(currentUser.id, dateStr, planContent)
+        } catch (e) {
+            console.error(e)
+        } finally {
+            setSavingPlan(false)
+        }
+    }
 
     const handleAddTask = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -143,6 +172,16 @@ export default function Workspace({ initialRoom, currentUser, todayLog }: Worksp
                         >
                             <Notebook className="w-4 h-4" />
                             Today
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('plan')}
+                            className={clsx(
+                                "px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 flex items-center gap-2 whitespace-nowrap",
+                                activeTab === 'plan' ? "bg-primary text-white shadow-lg" : "text-zinc-400 hover:text-white"
+                            )}
+                        >
+                            <CalendarPlus className="w-4 h-4" />
+                            Plan
                         </button>
                         <button
                             onClick={() => setActiveTab('history')}
@@ -257,6 +296,44 @@ export default function Workspace({ initialRoom, currentUser, todayLog }: Worksp
                                 )}
                             </div>
                         )}
+                )}
+
+                        {activeTab === 'plan' && (
+                            <div className="max-w-2xl mx-auto">
+                                <div className="glass-card p-6 rounded-2xl">
+                                    <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                                        <CalendarPlus className="w-5 h-5 text-primary" />
+                                        Plan for Tomorrow
+                                    </h2>
+                                    <p className="text-zinc-400 text-sm mb-6">
+                                        What is your main focus for the next day?
+                                    </p>
+
+                                    {loadingPlan ? (
+                                        <div className="text-center py-10">
+                                            <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            <textarea
+                                                value={planContent}
+                                                onChange={(e) => setPlanContent(e.target.value)}
+                                                placeholder="I want to focus on..."
+                                                className="w-full h-40 glass-input rounded-xl p-4 text-white resize-none"
+                                            />
+                                            <div className="flex justify-end">
+                                                <button
+                                                    onClick={handleSavePlan}
+                                                    disabled={savingPlan}
+                                                    className="px-6 py-2 bg-primary hover:bg-primary/80 text-white rounded-lg font-medium transition-all disabled:opacity-50 flex items-center gap-2"
+                                                >
+                                                    {savingPlan ? 'Saving...' : 'Save Plan'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                     </div>
                 )}
             </main>
