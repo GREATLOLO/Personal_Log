@@ -296,44 +296,44 @@ export default function Workspace({ initialRoom, currentUser, todayLog }: Worksp
                                 )}
                             </div>
                         )}
+                    </div>
                 )}
 
-                        {activeTab === 'plan' && (
-                            <div className="max-w-2xl mx-auto">
-                                <div className="glass-card p-6 rounded-2xl">
-                                    <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
-                                        <CalendarPlus className="w-5 h-5 text-primary" />
-                                        Plan for Tomorrow
-                                    </h2>
-                                    <p className="text-zinc-400 text-sm mb-6">
-                                        What is your main focus for the next day?
-                                    </p>
+                {activeTab === 'plan' && (
+                    <div className="max-w-2xl mx-auto">
+                        <div className="glass-card p-6 rounded-2xl">
+                            <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                                <CalendarPlus className="w-5 h-5 text-primary" />
+                                Plan for Tomorrow
+                            </h2>
+                            <p className="text-zinc-400 text-sm mb-6">
+                                What is your main focus for the next day?
+                            </p>
 
-                                    {loadingPlan ? (
-                                        <div className="text-center py-10">
-                                            <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-4">
-                                            <textarea
-                                                value={planContent}
-                                                onChange={(e) => setPlanContent(e.target.value)}
-                                                placeholder="I want to focus on..."
-                                                className="w-full h-40 glass-input rounded-xl p-4 text-white resize-none"
-                                            />
-                                            <div className="flex justify-end">
-                                                <button
-                                                    onClick={handleSavePlan}
-                                                    disabled={savingPlan}
-                                                    className="px-6 py-2 bg-primary hover:bg-primary/80 text-white rounded-lg font-medium transition-all disabled:opacity-50 flex items-center gap-2"
-                                                >
-                                                    {savingPlan ? 'Saving...' : 'Save Plan'}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
+                            {loadingPlan ? (
+                                <div className="text-center py-10">
+                                    <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
                                 </div>
-                            </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <textarea
+                                        value={planContent}
+                                        onChange={(e) => setPlanContent(e.target.value)}
+                                        placeholder="I want to focus on..."
+                                        className="w-full h-40 glass-input rounded-xl p-4 text-white resize-none"
+                                    />
+                                    <div className="flex justify-end">
+                                        <button
+                                            onClick={handleSavePlan}
+                                            disabled={savingPlan}
+                                            className="px-6 py-2 bg-primary hover:bg-primary/80 text-white rounded-lg font-medium transition-all disabled:opacity-50 flex items-center gap-2"
+                                        >
+                                            {savingPlan ? 'Saving...' : 'Save Plan'}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
             </main>
