@@ -90,7 +90,7 @@ This project is optimized for deployment on **Vercel**.
 
 ## 📝 Usage
 
-1. **Login**: Enter your authorized name ("Keqing" or "Winter"). No password is required.
+1. **Login**: Enter your authorized name. No password is required.
 2. **Dashboard**: Navigate your daily tasks and plans.
 3. **History**: Access the sidebar or navigation to view past logs and completed objectives.
 
