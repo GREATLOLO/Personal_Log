@@ -8,8 +8,32 @@ import { redirect } from 'next/navigation'
 
 // --- Auth & Room ---
 
+// --- Date Helpers ---
+
+export async function getEffectiveToday() {
+    const cookieStore = await cookies()
+    const offset = parseInt(cookieStore.get('dateOffset')?.value || '0')
+    const date = new Date()
+    if (offset) {
+        date.setDate(date.getDate() + offset)
+    }
+    return format(date, 'yyyy-MM-dd')
+}
+
+export async function advanceDay() {
+    const cookieStore = await cookies()
+    const currentOffset = parseInt(cookieStore.get('dateOffset')?.value || '0')
+    cookieStore.set('dateOffset', (currentOffset + 1).toString())
+    revalidatePath('/')
+}
+
+export async function resetDateOffset() {
+    const cookieStore = await cookies()
+    cookieStore.delete('dateOffset')
+    revalidatePath('/')
+}
+
 // --- Auth & Room ---
-// Strict access control: Only Keqing and Winter allowed.
 
 function verifyCredentials(name: string): boolean {
     const normalized = name.trim().toLowerCase()
@@ -110,7 +134,7 @@ export async function deleteTask(taskId: string) {
 }
 
 export async function toggleTaskCompletion(taskId: string, userId: string, isCompleted: boolean) {
-    const today = format(new Date(), 'yyyy-MM-dd')
+    const today = await getEffectiveToday()
 
     if (isCompleted) {
         // Upsert completion
@@ -148,7 +172,7 @@ export async function toggleTaskCompletion(taskId: string, userId: string, isCom
 // --- Daily Log ---
 
 export async function getDailyLog(roomId: string, dateStr?: string) {
-    const date = dateStr || format(new Date(), 'yyyy-MM-dd')
+    const date = dateStr || await getEffectiveToday()
 
     // Get all users in the room
     const users = await prisma.user.findMany({
@@ -184,7 +208,7 @@ export async function getHistoryDates(roomId: string) {
         }
     })
 
-    const today = format(new Date(), 'yyyy-MM-dd')
+    const today = await getEffectiveToday()
     return completions
         .map((c: { date: string }) => c.date)
         .filter((date: string) => date !== today)
@@ -218,5 +242,66 @@ export async function saveDailyPlan(userId: string, date: string, content: strin
             content
         }
     })
+    revalidatePath('/')
+}
+// --- Google Docs Sync ---
+import { google } from 'googleapis'
+
+export async function syncToGoogleDocs(users: any[], date?: string) {
+    const auth = new google.auth.JWT(
+        process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        undefined,
+        process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        ['https://www.googleapis.com/auth/documents']
+    )
+
+    const docs = google.docs({ version: 'v1', auth })
+    const documentId = process.env.GOOGLE_DOC_ID
+
+    if (!documentId) throw new Error('GOOGLE_DOC_ID not set')
+
+    const dateHeader = date ? `Daily Log for ${date}` : "Daily Log (Current Session)"
+    const logBody = users.map(user => {
+        const tasks = user.completions.map((c: any) => `- ${c.task.content}`).join('\n')
+        return `## ${user.name}\n${tasks || '*No tasks completed*'}`
+    }).join('\n\n')
+
+    const content = `\n\n# ${dateHeader}\n${logBody}\n${'='.repeat(30)}\n`
+
+    await docs.documents.batchUpdate({
+        documentId,
+        requestBody: {
+            requests: [
+                {
+                    insertText: {
+                        endOfSegmentLocation: {},
+                        text: content,
+                    },
+                },
+            ],
+        },
+    })
+}
+
+// --- Test Actions ---
+
+export async function deleteHistory(userId: string, roomId: string) {
+    // Delete completions for this user in this room
+    await prisma.completion.deleteMany({
+        where: {
+            userId,
+            task: {
+                roomId
+            }
+        }
+    })
+
+    // Delete plans for this user
+    await prisma.dailyPlan.deleteMany({
+        where: {
+            userId
+        }
+    })
+
     revalidatePath('/')
 }

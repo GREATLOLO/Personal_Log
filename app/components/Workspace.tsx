@@ -4,9 +4,21 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { TaskItem } from './TaskItem'
 import { LogView } from './LogView'
-import { createTask, getHistoryDates, getDailyLog, logout, getDailyPlan, saveDailyPlan } from '@/app/actions'
-import { Plus, Notebook, ListTodo, History, ArrowLeft, LogOut, CalendarPlus } from 'lucide-react'
+import {
+    createTask,
+    getHistoryDates,
+    getDailyLog,
+    logout,
+    getDailyPlan,
+    saveDailyPlan,
+    advanceDay,
+    deleteHistory,
+    getEffectiveToday,
+    resetDateOffset
+} from '@/app/actions'
+import { Plus, Notebook, ListTodo, History, ArrowLeft, LogOut, CalendarPlus, Target, Trash2, RefreshCw } from 'lucide-react'
 import { clsx } from 'clsx'
+import { format, addDays, parseISO } from 'date-fns'
 
 type User = {
     id: string
@@ -58,6 +70,10 @@ export default function Workspace({ initialRoom, currentUser, todayLog }: Worksp
     const [planContent, setPlanContent] = useState('')
     const [loadingPlan, setLoadingPlan] = useState(false)
     const [savingPlan, setSavingPlan] = useState(false)
+    const [todayTarget, setTodayTarget] = useState<string | null>(null)
+    const [currentDate, setCurrentDate] = useState<string>('')
+    const [isDeleting, setIsDeleting] = useState(false)
+    const [isAdvancing, setIsAdvancing] = useState(false)
 
     // Polling for updates
     useEffect(() => {
@@ -69,15 +85,28 @@ export default function Workspace({ initialRoom, currentUser, todayLog }: Worksp
         return () => clearInterval(interval)
     }, [router, activeTab])
 
+    // Initial date fetch
+    useEffect(() => {
+        getEffectiveToday().then(setCurrentDate)
+    }, [])
+
+    // Refresh today's target when date or completions change
+    useEffect(() => {
+        if (currentDate) {
+            getDailyPlan(currentUser.id, currentDate).then(plan => {
+                setTodayTarget(plan?.content || null)
+            })
+        }
+    }, [currentDate, currentUser.id, todayLog])
+
     // Fetch history dates when tab is opened
     useEffect(() => {
         if (activeTab === 'history' && !selectedHistoryDate) {
             getHistoryDates(initialRoom.id).then(setHistoryDates)
         }
-        if (activeTab === 'plan') {
-            const tomorrow = new Date()
-            tomorrow.setDate(tomorrow.getDate() + 1)
-            const dateStr = tomorrow.toISOString().split('T')[0]
+        if (activeTab === 'plan' && currentDate) {
+            const tomDate = addDays(parseISO(currentDate), 1)
+            const dateStr = format(tomDate, 'yyyy-MM-dd')
 
             setLoadingPlan(true)
             getDailyPlan(currentUser.id, dateStr).then(plan => {
@@ -85,14 +114,14 @@ export default function Workspace({ initialRoom, currentUser, todayLog }: Worksp
                 setLoadingPlan(false)
             })
         }
-    }, [activeTab, initialRoom.id, selectedHistoryDate, currentUser.id])
+    }, [activeTab, initialRoom.id, selectedHistoryDate, currentUser.id, currentDate])
 
     const handleSavePlan = async () => {
+        if (!currentDate) return
         setSavingPlan(true)
         try {
-            const tomorrow = new Date()
-            tomorrow.setDate(tomorrow.getDate() + 1)
-            const dateStr = tomorrow.toISOString().split('T')[0]
+            const tomDate = addDays(parseISO(currentDate), 1)
+            const dateStr = format(tomDate, 'yyyy-MM-dd')
 
             await saveDailyPlan(currentUser.id, dateStr, planContent)
         } catch (e) {
@@ -130,6 +159,29 @@ export default function Workspace({ initialRoom, currentUser, todayLog }: Worksp
         setHistoryLog([])
         // Refresh dates list
         getHistoryDates(initialRoom.id).then(setHistoryDates)
+    }
+
+    const handleAdvanceDay = async () => {
+        setIsAdvancing(true)
+        await advanceDay()
+        const newDate = await getEffectiveToday()
+        setCurrentDate(newDate)
+        setIsAdvancing(false)
+    }
+
+    const handleDeleteHistory = async () => {
+        if (confirm('Are you sure you want to delete ALL your history and plans? This cannot be undone.')) {
+            setIsDeleting(true)
+            await deleteHistory(currentUser.id, initialRoom.id)
+            router.refresh()
+            setIsDeleting(false)
+        }
+    }
+
+    const handleResetDate = async () => {
+        await resetDateOffset()
+        const newDate = await getEffectiveToday()
+        setCurrentDate(newDate)
     }
 
     return (
@@ -198,9 +250,22 @@ export default function Workspace({ initialRoom, currentUser, todayLog }: Worksp
             </header>
 
             {/* Main Content */}
-            <main className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <main className="animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
                 {activeTab === 'tasks' && (
                     <div className="space-y-6">
+                        {/* Today's Target Display */}
+                        {todayTarget && (
+                            <div className="glass p-5 rounded-2xl border-primary/20 bg-primary/5 mb-6">
+                                <div className="flex items-center gap-2 mb-2 text-primary">
+                                    <Target className="w-4 h-4" />
+                                    <span className="text-xs font-bold uppercase tracking-wider">Today's Target</span>
+                                </div>
+                                <p className="text-zinc-100 text-lg leading-relaxed">
+                                    {todayTarget}
+                                </p>
+                            </div>
+                        )}
+
                         {/* Add Task */}
                         <form onSubmit={handleAddTask} className="relative group">
                             <input
@@ -337,6 +402,36 @@ export default function Workspace({ initialRoom, currentUser, todayLog }: Worksp
                     </div>
                 )}
             </main>
+
+            {/* Test Utilities - Bottom of Workspace */}
+            <div className="mt-12 pt-8 border-t border-white/5 flex flex-wrap items-center justify-center gap-4 text-xs opacity-40 hover:opacity-100 transition-opacity">
+                <p className="w-full text-center text-zinc-500 mb-2 font-medium">Test Utilities (Temporary)</p>
+                <button
+                    onClick={handleAdvanceDay}
+                    disabled={isAdvancing}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-violet-500/20 text-zinc-400 hover:text-violet-400 border border-transparent hover:border-violet-500/30 transition-all"
+                >
+                    <RefreshCw className={clsx("w-3 h-3", isAdvancing && "animate-spin")} />
+                    Reach Next Day
+                </button>
+                <button
+                    onClick={handleResetDate}
+                    className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-cyan-500/20 text-zinc-400 hover:text-cyan-400 border border-transparent hover:border-cyan-500/30 transition-all"
+                >
+                    Reset Date
+                </button>
+                <button
+                    onClick={handleDeleteHistory}
+                    disabled={isDeleting}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-red-500/20 text-zinc-400 hover:text-red-400 border border-transparent hover:border-red-500/30 transition-all"
+                >
+                    <Trash2 className="w-3 h-3" />
+                    Delete History
+                </button>
+                <p className="w-full text-center text-zinc-600 mt-2">
+                    Current Simulation Date: <span className="text-zinc-400 font-mono">{currentDate || 'Loading...'}</span>
+                </p>
+            </div>
         </div>
     )
 }
