@@ -248,12 +248,11 @@ export async function saveDailyPlan(userId: string, date: string, content: strin
 import { google } from 'googleapis'
 
 export async function syncToGoogleDocs(users: any[], date?: string) {
-    const auth = new google.auth.JWT(
-        process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-        undefined,
-        process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-        ['https://www.googleapis.com/auth/documents']
-    )
+    const auth = new google.auth.JWT({
+        email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        scopes: ['https://www.googleapis.com/auth/documents']
+    })
 
     const docs = google.docs({ version: 'v1', auth })
     const documentId = process.env.GOOGLE_DOC_ID
