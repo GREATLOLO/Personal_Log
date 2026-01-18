@@ -338,7 +338,9 @@ export async function deleteHistory(userId: string, roomId: string) {
     revalidatePath('/')
 }
 
-// --- Gemini AI Agent ---
+// --- Vercel AI SDK & AI Gateway integration ---
+import { createGoogleGenerativeAI } from '@ai-sdk/google'
+import { generateText } from 'ai'
 
 export async function refinePlanWithAI(content: string) {
     const apiKey = process.env.GOOGLE_GENAI_API_KEY
@@ -346,27 +348,44 @@ export async function refinePlanWithAI(content: string) {
         return { success: false, error: 'Gemini API Key missing (GOOGLE_GENAI_API_KEY)' }
     }
 
+    // Configure the Google provider to use Vercel AI Gateway
+    const google = createGoogleGenerativeAI({
+        apiKey,
+        baseURL: 'https://ai-gateway.vercel.sh/v3/ai',
+    })
+
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{
-                    parts: [{
-                        text: `Refine and structure the following daily plan for maximum productivity. Keep it concise, professional, and actionable. Use bullet points: \n\n${content}`
-                    }]
-                }]
-            })
+        const { text } = await generateText({
+            model: google('gemini-1.5-flash'),
+            prompt: `
+            Analyze the following daily plan and provide a structured response.
+            1. A concise summary of the plan (max 2 sentences).
+            2. A list of specific, actionable bullet points for the next day.
+
+            Format the response clearly with "SUMMARY:" and "TASKS:" headers.
+
+            PLAN CONTENT:
+            ${content}
+            `,
         })
 
-        const data = await response.json()
-        const refinedContent = data.candidates?.[0]?.content?.parts?.[0]?.text
+        if (!text) throw new Error('Failed to generate plan refinement')
 
-        if (!refinedContent) throw new Error('Failed to get AI response')
+        // Simple parsing of the response
+        const summaryMatch = text.match(/SUMMARY:([\s\S]*?)(?=TASKS:|$)/i)
+        const tasksMatch = text.match(/TASKS:([\s\S]*)/i)
 
-        return { success: true, content: refinedContent.trim() }
+        const summary = summaryMatch ? summaryMatch[1].trim() : ""
+        const tasks = tasksMatch ? tasksMatch[1].trim() : ""
+
+        return {
+            success: true,
+            content: text.trim(),
+            summary,
+            tasks
+        }
     } catch (error) {
         console.error('AI Refinement failed:', error)
-        return { success: false, error: 'AI Refinement failed' }
+        return { success: false, error: 'AI Refinement failed. Make sure to npm install ai @ai-sdk/google' }
     }
 }

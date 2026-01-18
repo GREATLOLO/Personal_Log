@@ -18,7 +18,7 @@ import {
     getAllHistory,
     refinePlanWithAI
 } from '@/app/actions'
-import { Plus, Notebook, ListTodo, History, ArrowLeft, LogOut, CalendarPlus, Target, Trash2, RefreshCw } from 'lucide-react'
+import { Plus, Notebook, ListTodo, History, ArrowLeft, LogOut, CalendarPlus, Target, Trash2, RefreshCw, Sparkles, ListChecks } from 'lucide-react'
 import { clsx } from 'clsx'
 import { format, addDays, parseISO } from 'date-fns'
 
@@ -118,6 +118,9 @@ export default function Workspace({ initialRoom, currentUser, todayLog }: Worksp
         }
     }, [activeTab, initialRoom.id, selectedHistoryDate, currentUser.id, currentDate])
 
+    const [aiSummary, setAiSummary] = useState('')
+    const [aiTasks, setAiTasks] = useState('')
+
     const handleSavePlan = async () => {
         if (!currentDate) return
         setSavingPlan(true)
@@ -136,10 +139,16 @@ export default function Workspace({ initialRoom, currentUser, todayLog }: Worksp
     const handleRefinePlan = async () => {
         if (!planContent.trim()) return
         setLoadingPlan(true)
+        setAiSummary('')
+        setAiTasks('')
         try {
             const result = await refinePlanWithAI(planContent)
-            if (result.success && result.content) {
-                setPlanContent(result.content)
+            if (result.success) {
+                if (result.summary) setAiSummary(result.summary)
+                if (result.tasks) setAiTasks(result.tasks)
+                // Also update the main content if needed, but the user wants summary + bullet points
+                // We'll keep the refined content in planContent as well for saving
+                if (result.content) setPlanContent(result.content)
             } else {
                 alert(result.error || 'Failed to refine plan')
             }
@@ -283,14 +292,39 @@ export default function Workspace({ initialRoom, currentUser, todayLog }: Worksp
                                         placeholder="I want to focus on..."
                                         className="w-full h-40 glass-input rounded-xl p-4 text-white resize-none"
                                     />
+
+                                    {aiSummary && (
+                                        <div className="glass-card p-4 rounded-xl border border-primary/20 bg-primary/5">
+                                            <h3 className="text-sm font-bold text-primary mb-1 uppercase tracking-wider flex items-center gap-2">
+                                                <Sparkles className="w-4 h-4" />
+                                                AI Summary
+                                            </h3>
+                                            <p className="text-zinc-200 text-sm italic leading-relaxed">
+                                                "{aiSummary}"
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {aiTasks && (
+                                        <div className="glass-card p-4 rounded-xl border border-violet-500/20 bg-violet-500/5">
+                                            <h3 className="text-sm font-bold text-violet-400 mb-2 uppercase tracking-wider flex items-center gap-2">
+                                                <ListChecks className="w-4 h-4" />
+                                                Action Items
+                                            </h3>
+                                            <div className="text-zinc-300 text-sm whitespace-pre-line leading-relaxed">
+                                                {aiTasks}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div className="flex justify-between gap-4">
                                         <button
                                             onClick={handleRefinePlan}
                                             disabled={loadingPlan || !planContent.trim()}
                                             className="px-6 py-2 bg-violet-600/20 hover:bg-violet-600/40 text-violet-400 rounded-lg font-medium transition-all disabled:opacity-50 flex items-center gap-2 border border-violet-500/30"
                                         >
-                                            <refresh-cw className={clsx("w-4 h-4", loadingPlan && "animate-spin")} />
-                                            Refine with Gemini
+                                            <RefreshCw className={clsx("w-4 h-4", loadingPlan && "animate-spin")} />
+                                            Refine & Plan
                                         </button>
                                         <button
                                             onClick={handleSavePlan}
