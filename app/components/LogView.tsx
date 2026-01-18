@@ -62,35 +62,37 @@ export function LogView({ users, date }: LogViewProps) {
     return (
         <div className="space-y-6">
             <div className="flex justify-end gap-3">
-                <button
-                    onClick={handleSync}
-                    disabled={syncing}
-                    className={clsx(
-                        "flex items-center gap-2 px-4 py-2 rounded-xl transition-all border text-sm font-medium shadow-sm",
-                        syncStatus === 'success' ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" :
-                            syncStatus === 'error' ? "bg-red-500/10 border-red-500/30 text-red-400" :
-                                "bg-white/5 hover:bg-primary/20 text-zinc-300 hover:text-white border-white/10 hover:border-primary/30"
-                    )}
-                >
-                    {syncing ? (
-                        <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Syncing...
-                        </>
-                    ) : syncStatus === 'success' ? (
-                        <>
-                            <Check className="w-4 h-4" />
-                            Synced to Google Docs
-                        </>
-                    ) : syncStatus === 'error' ? (
-                        "Sync Failed"
-                    ) : (
-                        <>
-                            <Share2 className="w-4 h-4" />
-                            Sync to Google Docs
-                        </>
-                    )}
-                </button>
+                {date && (
+                    <button
+                        onClick={handleSync}
+                        disabled={syncing}
+                        className={clsx(
+                            "flex items-center gap-2 px-4 py-2 rounded-xl transition-all border text-sm font-medium shadow-sm",
+                            syncStatus === 'success' ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" :
+                                syncStatus === 'error' ? "bg-red-500/10 border-red-500/30 text-red-400" :
+                                    "bg-white/5 hover:bg-primary/20 text-zinc-300 hover:text-white border-white/10 hover:border-primary/30"
+                        )}
+                    >
+                        {syncing ? (
+                            <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Syncing...
+                            </>
+                        ) : syncStatus === 'success' ? (
+                            <>
+                                <Check className="w-4 h-4" />
+                                Synced to Google Docs
+                            </>
+                        ) : syncStatus === 'error' ? (
+                            "Sync Failed"
+                        ) : (
+                            <>
+                                <Share2 className="w-4 h-4" />
+                                Sync to Google Docs
+                            </>
+                        )}
+                    </button>
+                )}
 
                 <button
                     onClick={handleCopy}

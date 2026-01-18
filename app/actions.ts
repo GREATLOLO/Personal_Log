@@ -256,16 +256,18 @@ export async function syncToGoogleDocs(users: any[], date?: string) {
 
     const docs = google.docs({ version: 'v1', auth })
     const documentId = process.env.GOOGLE_DOC_ID
+    const adkName = process.env.GOOGLE_ADK_NAME || 'Default ADK'
 
     if (!documentId) throw new Error('GOOGLE_DOC_ID not set')
 
     const dateHeader = date ? `Daily Log for ${date}` : "Daily Log (Current Session)"
     const logBody = users.map(user => {
         const tasks = user.completions.map((c: any) => `- ${c.task.content}`).join('\n')
-        return `## ${user.name}\n${tasks || '*No tasks completed*'}`
+        return `### ${user.name}\n${tasks || '*No tasks completed*'}`
     }).join('\n\n')
 
-    const content = `\n\n# ${dateHeader}\n${logBody}\n${'='.repeat(30)}\n`
+    const separator = '='.repeat(40)
+    const content = `\n\n# ${dateHeader}\n**Sync Source: ${adkName}**\n\n${logBody}\n\n${separator}\n`
 
     await docs.documents.batchUpdate({
         documentId,
