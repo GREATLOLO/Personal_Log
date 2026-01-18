@@ -14,7 +14,9 @@ import {
     advanceDay,
     deleteHistory,
     getEffectiveToday,
-    resetDateOffset
+    resetDateOffset,
+    getAllHistory,
+    refinePlanWithAI
 } from '@/app/actions'
 import { Plus, Notebook, ListTodo, History, ArrowLeft, LogOut, CalendarPlus, Target, Trash2, RefreshCw } from 'lucide-react'
 import { clsx } from 'clsx'
@@ -131,6 +133,23 @@ export default function Workspace({ initialRoom, currentUser, todayLog }: Worksp
         }
     }
 
+    const handleRefinePlan = async () => {
+        if (!planContent.trim()) return
+        setLoadingPlan(true)
+        try {
+            const result = await refinePlanWithAI(planContent)
+            if (result.success && result.content) {
+                setPlanContent(result.content)
+            } else {
+                alert(result.error || 'Failed to refine plan')
+            }
+        } catch (e) {
+            console.error(e)
+        } finally {
+            setLoadingPlan(false)
+        }
+    }
+
     const handleAddTask = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!newTaskContent.trim() || isSubmitting) return
@@ -212,8 +231,8 @@ export default function Workspace({ initialRoom, currentUser, todayLog }: Worksp
                                 activeTab === 'tasks' ? "bg-primary text-white shadow-lg" : "text-zinc-400 hover:text-white"
                             )}
                         >
-                            <ListTodo className="w-4 h-4" />
-                            Tasks
+                            <CalendarPlus className="w-4 h-4" />
+                            Next Day Plan
                         </button>
                         <button
                             onClick={() => setActiveTab('log')}
@@ -224,16 +243,6 @@ export default function Workspace({ initialRoom, currentUser, todayLog }: Worksp
                         >
                             <Notebook className="w-4 h-4" />
                             Today
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('plan')}
-                            className={clsx(
-                                "px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 flex items-center gap-2 whitespace-nowrap",
-                                activeTab === 'plan' ? "bg-primary text-white shadow-lg" : "text-zinc-400 hover:text-white"
-                            )}
-                        >
-                            <CalendarPlus className="w-4 h-4" />
-                            Plan
                         </button>
                         <button
                             onClick={() => setActiveTab('history')}
@@ -252,60 +261,53 @@ export default function Workspace({ initialRoom, currentUser, todayLog }: Worksp
             {/* Main Content */}
             <main className="animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
                 {activeTab === 'tasks' && (
-                    <div className="space-y-6">
-                        {/* Today's Target Display */}
-                        {todayTarget && (
-                            <div className="glass p-5 rounded-2xl border-primary/20 bg-primary/5 mb-6">
-                                <div className="flex items-center gap-2 mb-2 text-primary">
-                                    <Target className="w-4 h-4" />
-                                    <span className="text-xs font-bold uppercase tracking-wider">Today's Target</span>
-                                </div>
-                                <p className="text-zinc-100 text-lg leading-relaxed">
-                                    {todayTarget}
-                                </p>
-                            </div>
-                        )}
+                    <div className="max-w-2xl mx-auto space-y-6">
+                        <div className="glass-card p-6 rounded-2xl">
+                            <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                                <CalendarPlus className="w-5 h-5 text-primary" />
+                                Plan for Tomorrow
+                            </h2>
+                            <p className="text-zinc-400 text-sm mb-6">
+                                What is your main focus for the next day?
+                            </p>
 
-                        {/* Add Task */}
-                        <form onSubmit={handleAddTask} className="relative group">
-                            <input
-                                type="text"
-                                value={newTaskContent}
-                                onChange={(e) => setNewTaskContent(e.target.value)}
-                                placeholder="What needs to be done?"
-                                className="w-full pl-12 pr-4 py-4 rounded-2xl glass-input text-lg text-white"
-                            />
-                            <Plus className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-primary transition-colors" />
-                            <button
-                                type="submit"
-                                disabled={!newTaskContent.trim() || isSubmitting}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/10 hover:bg-primary text-white p-2 rounded-xl transition-all disabled:opacity-0"
-                            >
-                                <Plus className="w-5 h-5" />
-                            </button>
-                        </form>
-
-                        {/* Task List */}
-                        <div className="space-y-1">
-                            {initialRoom.tasks.length === 0 ? (
-                                <div className="text-center py-20 text-zinc-500">
-                                    <p>No tasks yet. Add one above!</p>
+                            {loadingPlan ? (
+                                <div className="text-center py-10">
+                                    <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
                                 </div>
                             ) : (
-                                initialRoom.tasks.map(task => (
-                                    <TaskItem
-                                        key={task.id}
-                                        task={task as any}
-                                        currentUserId={currentUser.id}
+                                <div className="space-y-4">
+                                    <textarea
+                                        value={planContent}
+                                        onChange={(e) => setPlanContent(e.target.value)}
+                                        placeholder="I want to focus on..."
+                                        className="w-full h-40 glass-input rounded-xl p-4 text-white resize-none"
                                     />
-                                ))
+                                    <div className="flex justify-between gap-4">
+                                        <button
+                                            onClick={handleRefinePlan}
+                                            disabled={loadingPlan || !planContent.trim()}
+                                            className="px-6 py-2 bg-violet-600/20 hover:bg-violet-600/40 text-violet-400 rounded-lg font-medium transition-all disabled:opacity-50 flex items-center gap-2 border border-violet-500/30"
+                                        >
+                                            <refresh-cw className={clsx("w-4 h-4", loadingPlan && "animate-spin")} />
+                                            Refine with Gemini
+                                        </button>
+                                        <button
+                                            onClick={handleSavePlan}
+                                            disabled={savingPlan}
+                                            className="px-6 py-2 bg-primary hover:bg-primary/80 text-white rounded-lg font-medium transition-all disabled:opacity-50 flex items-center gap-2"
+                                        >
+                                            {savingPlan ? 'Saving...' : 'Save Plan'}
+                                        </button>
+                                    </div>
+                                </div>
                             )}
                         </div>
                     </div>
                 )}
 
                 {activeTab === 'log' && (
-                    <LogView users={todayLog} />
+                    <LogView users={todayLog} roomId={initialRoom.id} />
                 )}
 
 
@@ -377,50 +379,14 @@ export default function Workspace({ initialRoom, currentUser, todayLog }: Worksp
                                         Loading...
                                     </div>
                                 ) : (
-                                    <LogView users={historyLog} date={selectedHistoryDate} />
+                                    <LogView users={historyLog} date={selectedHistoryDate} roomId={initialRoom.id} />
                                 )}
                             </div>
                         )}
                     </div>
                 )}
 
-                {activeTab === 'plan' && (
-                    <div className="max-w-2xl mx-auto">
-                        <div className="glass-card p-6 rounded-2xl">
-                            <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
-                                <CalendarPlus className="w-5 h-5 text-primary" />
-                                Plan for Tomorrow
-                            </h2>
-                            <p className="text-zinc-400 text-sm mb-6">
-                                What is your main focus for the next day?
-                            </p>
-
-                            {loadingPlan ? (
-                                <div className="text-center py-10">
-                                    <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
-                                </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    <textarea
-                                        value={planContent}
-                                        onChange={(e) => setPlanContent(e.target.value)}
-                                        placeholder="I want to focus on..."
-                                        className="w-full h-40 glass-input rounded-xl p-4 text-white resize-none"
-                                    />
-                                    <div className="flex justify-end">
-                                        <button
-                                            onClick={handleSavePlan}
-                                            disabled={savingPlan}
-                                            className="px-6 py-2 bg-primary hover:bg-primary/80 text-white rounded-lg font-medium transition-all disabled:opacity-50 flex items-center gap-2"
-                                        >
-                                            {savingPlan ? 'Saving...' : 'Save Plan'}
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
+                {/* Removed separate plan tab as it's merged into the first tab */}
             </main>
 
             {/* Test Utilities - Bottom of Workspace */}

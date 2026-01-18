@@ -214,6 +214,37 @@ export async function getHistoryDates(roomId: string) {
         .filter((date: string) => date !== today)
 }
 
+export async function getAllHistory(roomId: string) {
+    // Fetch all completions for the room, ordered by date
+    const users = await prisma.user.findMany({
+        where: { roomId },
+        include: {
+            completions: {
+                include: {
+                    task: true
+                },
+                orderBy: {
+                    date: 'desc'
+                }
+            }
+        }
+    })
+
+    // Group completions by date
+    const historyByDate: Record<string, any[]> = {}
+    users.forEach(user => {
+        user.completions.forEach(c => {
+            if (!historyByDate[c.date]) historyByDate[c.date] = []
+            historyByDate[c.date].push({
+                userName: user.name,
+                content: c.task.content
+            })
+        })
+    })
+
+    return historyByDate
+}
+
 // --- Daily Plan ---
 
 export async function getDailyPlan(userId: string, date: string) {
@@ -305,4 +336,37 @@ export async function deleteHistory(userId: string, roomId: string) {
     })
 
     revalidatePath('/')
+}
+
+// --- Gemini AI Agent ---
+
+export async function refinePlanWithAI(content: string) {
+    const apiKey = process.env.GOOGLE_GENAI_API_KEY
+    if (!apiKey) {
+        return { success: false, error: 'Gemini API Key missing (GOOGLE_GENAI_API_KEY)' }
+    }
+
+    try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{
+                    parts: [{
+                        text: `Refine and structure the following daily plan for maximum productivity. Keep it concise, professional, and actionable. Use bullet points: \n\n${content}`
+                    }]
+                }]
+            })
+        })
+
+        const data = await response.json()
+        const refinedContent = data.candidates?.[0]?.content?.parts?.[0]?.text
+
+        if (!refinedContent) throw new Error('Failed to get AI response')
+
+        return { success: true, content: refinedContent.trim() }
+    } catch (error) {
+        console.error('AI Refinement failed:', error)
+        return { success: false, error: 'AI Refinement failed' }
+    }
 }

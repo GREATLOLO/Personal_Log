@@ -23,24 +23,54 @@ type DailyLogUser = User & {
 interface LogViewProps {
     users: DailyLogUser[]
     date?: string
+    roomId?: string
 }
 
-export function LogView({ users, date }: LogViewProps) {
+export function LogView({ users, date, roomId }: LogViewProps) {
     const [copied, setCopied] = useState(false)
     const [syncing, setSyncing] = useState(false)
     const [syncStatus, setSyncStatus] = useState<'idle' | 'success' | 'error'>('idle')
 
-    const handleCopy = () => {
-        const text = users.map(user => {
-            const tasks = user.completions.map(c => `- ${c.task.content}`).join('\n');
-            return `## ${user.name}\n${tasks || '*No tasks completed*'}`;
-        }).join('\n\n');
+    const handleCopy = async () => {
+        if (!date) return // Should not happen with new UI logic but for safety
 
-        const header = date ? `Daily Log for ${date}` : "Daily Log (Current Session)";
-        navigator.clipboard.writeText(`# ${header}\n\n${text}`);
+        if (roomId) {
+            // "Copy All History" mode
+            setSyncing(true)
+            try {
+                const { getAllHistory } = await import('@/app/actions')
+                const history = await getAllHistory(roomId)
 
-        setCopied(true)
-        setTimeout(() => setCopied(false), 2000)
+                let fullText = "# All Historical Logs\n\n"
+                Object.entries(history).sort((a, b) => b[0].localeCompare(a[0])).forEach(([d, logs]) => {
+                    fullText += `## Log for ${d}\n`
+                    logs.forEach((log: any) => {
+                        fullText += `### ${log.userName}\n- ${log.content}\n`
+                    })
+                    fullText += "\n" + "=".repeat(20) + "\n\n"
+                })
+
+                await navigator.clipboard.writeText(fullText)
+                setCopied(true)
+                setTimeout(() => setCopied(false), 2000)
+            } catch (error) {
+                console.error('Copy all history failed:', error)
+            } finally {
+                setSyncing(false)
+            }
+        } else {
+            // Single date copy (legacy fallback)
+            const text = users.map(user => {
+                const tasks = user.completions.map(c => `- ${c.task.content}`).join('\n');
+                return `## ${user.name}\n${tasks || '*No tasks completed*'}`;
+            }).join('\n\n');
+
+            const header = date ? `Daily Log for ${date}` : "Daily Log (Current Session)";
+            navigator.clipboard.writeText(`# ${header}\n\n${text}`);
+
+            setCopied(true)
+            setTimeout(() => setCopied(false), 2000)
+        }
     }
 
     const handleSync = async () => {
@@ -59,57 +89,60 @@ export function LogView({ users, date }: LogViewProps) {
         }
     }
 
+
     return (
         <div className="space-y-6">
             <div className="flex justify-end gap-3">
                 {date && (
-                    <button
-                        onClick={handleSync}
-                        disabled={syncing}
-                        className={clsx(
-                            "flex items-center gap-2 px-4 py-2 rounded-xl transition-all border text-sm font-medium shadow-sm",
-                            syncStatus === 'success' ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" :
-                                syncStatus === 'error' ? "bg-red-500/10 border-red-500/30 text-red-400" :
-                                    "bg-white/5 hover:bg-primary/20 text-zinc-300 hover:text-white border-white/10 hover:border-primary/30"
-                        )}
-                    >
-                        {syncing ? (
-                            <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                Syncing...
-                            </>
-                        ) : syncStatus === 'success' ? (
-                            <>
-                                <Check className="w-4 h-4" />
-                                Synced to Google Docs
-                            </>
-                        ) : syncStatus === 'error' ? (
-                            "Sync Failed"
-                        ) : (
-                            <>
-                                <Share2 className="w-4 h-4" />
-                                Sync to Google Docs
-                            </>
-                        )}
-                    </button>
-                )}
+                    <>
+                        <button
+                            onClick={handleSync}
+                            disabled={syncing}
+                            className={clsx(
+                                "flex items-center gap-2 px-4 py-2 rounded-xl transition-all border text-sm font-medium shadow-sm",
+                                syncStatus === 'success' ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" :
+                                    syncStatus === 'error' ? "bg-red-500/10 border-red-500/30 text-red-400" :
+                                        "bg-white/5 hover:bg-primary/20 text-zinc-300 hover:text-white border-white/10 hover:border-primary/30"
+                            )}
+                        >
+                            {syncing ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Syncing...
+                                </>
+                            ) : syncStatus === 'success' ? (
+                                <>
+                                    <Check className="w-4 h-4" />
+                                    Synced to Google Docs
+                                </>
+                            ) : syncStatus === 'error' ? (
+                                "Sync Failed"
+                            ) : (
+                                <>
+                                    <Share2 className="w-4 h-4" />
+                                    Sync to Google Docs
+                                </>
+                            )}
+                        </button>
 
-                <button
-                    onClick={handleCopy}
-                    className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-primary/20 text-zinc-300 hover:text-white rounded-xl transition-all border border-white/10 text-sm font-medium shadow-sm hover:border-primary/30"
-                >
-                    {copied ? (
-                        <>
-                            <Check className="w-4 h-4 text-emerald-400" />
-                            Copied!
-                        </>
-                    ) : (
-                        <>
-                            <Copy className="w-4 h-4" />
-                            Copy for Google Docs
-                        </>
-                    )}
-                </button>
+                        <button
+                            onClick={handleCopy}
+                            className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-primary/20 text-zinc-300 hover:text-white rounded-xl transition-all border border-white/10 text-sm font-medium shadow-sm hover:border-primary/30"
+                        >
+                            {copied ? (
+                                <>
+                                    <Check className="w-4 h-4 text-emerald-400" />
+                                    Copied!
+                                </>
+                            ) : (
+                                <>
+                                    <Copy className="w-4 h-4" />
+                                    Copy All History
+                                </>
+                            )}
+                        </button>
+                    </>
+                )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
