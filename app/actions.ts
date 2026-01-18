@@ -351,7 +351,7 @@ export async function refinePlanWithAI(content: string) {
     // Configure the Google provider to use Vercel AI Gateway
     const google = createGoogleGenerativeAI({
         apiKey,
-        baseURL: 'https://ai-gateway.vercel.sh/v3/ai',
+        baseURL: 'https://ai-gateway.vercel.sh/v1/keqing/personal-log',
     })
 
     try {

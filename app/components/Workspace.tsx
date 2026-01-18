@@ -18,7 +18,7 @@ import {
     getAllHistory,
     refinePlanWithAI
 } from '@/app/actions'
-import { Plus, Notebook, ListTodo, History, ArrowLeft, LogOut, CalendarPlus, Target, Trash2, RefreshCw, Sparkles, ListChecks } from 'lucide-react'
+import { Plus, Notebook, ListTodo, History, ArrowLeft, LogOut, CalendarPlus, Target, Trash2, RefreshCw, Sparkles, ListChecks, Check } from 'lucide-react'
 import { clsx } from 'clsx'
 import { format, addDays, parseISO } from 'date-fns'
 
@@ -341,7 +341,65 @@ export default function Workspace({ initialRoom, currentUser, todayLog }: Worksp
                 )}
 
                 {activeTab === 'log' && (
-                    <LogView users={todayLog} roomId={initialRoom.id} />
+                    <div className="max-w-2xl mx-auto space-y-8">
+                        {/* Current Checklist */}
+                        <div className="glass-card p-6 rounded-2xl">
+                            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                                <Target className="w-5 h-5 text-primary" />
+                                Today's Target
+                            </h2>
+
+                            <form onSubmit={handleAddTask} className="mb-8 group">
+                                <div className="flex gap-3">
+                                    <input
+                                        type="text"
+                                        value={newTaskContent}
+                                        onChange={(e) => setNewTaskContent(e.target.value)}
+                                        placeholder="Add a new goal for today..."
+                                        className="flex-1 glass-input rounded-xl px-4 py-2 text-white placeholder-zinc-500 focus:ring-2 focus:ring-primary/50 transition-all"
+                                        disabled={isSubmitting}
+                                    />
+                                    <button
+                                        type="submit"
+                                        disabled={isSubmitting || !newTaskContent.trim()}
+                                        className="p-2 bg-primary hover:bg-primary/80 disabled:opacity-50 text-white rounded-xl transition-all shadow-[0_0_15px_rgba(124,58,237,0.3)] hover:shadow-[0_0_20px_rgba(124,58,237,0.5)] active:scale-95"
+                                    >
+                                        <Plus className="w-6 h-6" />
+                                    </button>
+                                </div>
+                            </form>
+
+                            <div className="space-y-2">
+                                {initialRoom.tasks.filter(t => !t.completions.some(c => c.userId === currentUser.id && c.date === currentDate)).length === 0 && initialRoom.tasks.length > 0 ? (
+                                    <div className="text-center py-10 text-emerald-400/60 font-medium">
+                                        <Check className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                                        <p>Everything complete for now!</p>
+                                    </div>
+                                ) : initialRoom.tasks.length === 0 ? (
+                                    <div className="text-center py-10 text-zinc-500">
+                                        <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/5">
+                                            <ListTodo className="w-8 h-8 opacity-20" />
+                                        </div>
+                                        <p>No active targets. Add one above!</p>
+                                    </div>
+                                ) : (
+                                    initialRoom.tasks.map(task => (
+                                        <TaskItem
+                                            key={task.id}
+                                            task={task as any}
+                                            currentUserId={currentUser.id}
+                                        />
+                                    ))
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Session Activity */}
+                        <div className="pt-8 border-t border-white/5">
+                            <h3 className="text-sm font-bold text-zinc-500 mb-6 uppercase tracking-widest text-center">Session Activity</h3>
+                            <LogView users={todayLog} roomId={initialRoom.id} />
+                        </div>
+                    </div>
                 )}
 
 
