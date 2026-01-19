@@ -105,14 +105,29 @@ export async function login(name: string) {
         })
     }
 
-    // 4. Ensure User Exists in that Room
+    // 4. Ensure 1-to-1 User-Room mapping
+    // Remove any OTHER users from this room to ensure clean state
+    await prisma.user.deleteMany({
+        where: {
+            roomId: room.id,
+            name: { not: normalizedName }
+        }
+    })
+
+    // Find or create the user
     let user = await prisma.user.findFirst({
-        where: { name: normalizedName, roomId: room.id }
+        where: { roomId: room.id }
     })
 
     if (!user) {
         user = await prisma.user.create({
             data: { name: normalizedName, roomId: room.id }
+        })
+    } else if (user.name !== normalizedName) {
+        // Should have been deleted above, but safety check: update name
+        user = await prisma.user.update({
+            where: { id: user.id },
+            data: { name: normalizedName }
         })
     }
 
@@ -401,11 +416,11 @@ export async function refinePlanWithAI(content: string) {
         const { text } = await generateText({
             model: google('gemini-1.5-flash'),
             prompt: `
-            Analyze the following daily plan and provide a structured response.
-            1. A concise summary of the plan (max 2 sentences).
-            2. A list of specific, actionable bullet points for the next day.
-
-            Format the response clearly with "SUMMARY:" and "TASKS:" headers.
+            You are a direct task extractor.
+            Convert the following daily plan into a flat list of concise, actionable tasks.
+            Do not provide a summary.
+            Do not provide headers like "TASKS:".
+            Just list the tasks, one per line, starting with a dash "- ".
 
             PLAN CONTENT:
             ${content}
@@ -414,12 +429,9 @@ export async function refinePlanWithAI(content: string) {
 
         if (!text) throw new Error('Failed to generate plan refinement')
 
-        // Simple parsing of the response
-        const summaryMatch = text.match(/SUMMARY:([\s\S]*?)(?=TASKS:|$)/i)
-        const tasksMatch = text.match(/TASKS:([\s\S]*)/i)
-
-        const summary = summaryMatch ? summaryMatch[1].trim() : ""
-        const tasks = tasksMatch ? tasksMatch[1].trim() : ""
+        // Direct parsing: just split by newline and filter
+        const summary = "Plan converted to tasks."
+        const tasks = text.trim()
 
         return {
             success: true,
