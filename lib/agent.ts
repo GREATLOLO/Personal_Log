@@ -31,8 +31,6 @@ export function createTaskExtractorAgent() {
             "Extracts concise, actionable tasks from daily plans.",
 
         instruction: INSTRUCTION,
-
-        llm: genai,
     });
 
     return {
