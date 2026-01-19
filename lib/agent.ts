@@ -24,7 +24,7 @@ export function createTaskExtractorAgent() {
     const modelName = "gemini-2.5-flash-lite";
 
     const agent = new LlmAgent({
-        name: "task-extractor",
+        name: "task_extractor",
         model: modelName,
 
         description:
