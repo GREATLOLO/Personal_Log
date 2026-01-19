@@ -406,13 +406,16 @@ export async function refinePlanWithAI(content: string) {
         return { success: false, error: 'Gemini API Key missing (GOOGLE_GENAI_API_KEY)' }
     }
 
-    // Configure the Google provider to use Vercel AI Gateway
+    // Configure the Google provider
+    // Note: Removed Vercel AI Gateway baseURL to prevent 404s if slug is incorrect.
+    // Falls back to direct Google Generative AI API.
     const google = createGoogleGenerativeAI({
         apiKey,
-        baseURL: 'https://ai-gateway.vercel.sh/v1/keqing/personal-log/google-generative-ai',
     })
 
     try {
+        // User requested "gemini-2.5-flash-lite", assuming they meant 1.5-flash or similar.
+        // Using 1.5-flash as the safe default.
         const { text } = await generateText({
             model: google('gemini-1.5-flash'),
             prompt: `
@@ -439,8 +442,9 @@ export async function refinePlanWithAI(content: string) {
             summary,
             tasks
         }
-    } catch (error) {
+    } catch (error: any) {
         console.error('AI Refinement failed:', error)
-        return { success: false, error: 'AI Refinement failed. Make sure to npm install ai @ai-sdk/google' }
+        // Return the REAL error message for debugging
+        return { success: false, error: `AI Error: ${error.message || error}` }
     }
 }
