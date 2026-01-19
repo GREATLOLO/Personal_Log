@@ -399,9 +399,7 @@ export async function deleteHistory(userId: string, roomId: string) {
 // --- Vercel AI SDK & AI Gateway integration ---
 // import { createGoogleGenerativeAI } from '@ai-sdk/google'
 // import { generateText } from 'ai'
-import { LlmAgent } from "@google/adk";
-
-const GEMINI_MODEL = "gemini-2.5-flash";
+import { createTaskExtractorAgent } from "@/lib/agent";
 
 export async function refinePlanWithAI(content: string) {
     const apiKey = process.env.GOOGLE_GENAI_API_KEY
@@ -409,42 +407,34 @@ export async function refinePlanWithAI(content: string) {
         return { success: false, error: 'Gemini API Key missing (GOOGLE_GENAI_API_KEY)' }
     }
 
-    // Configure the Google provider with ADK
-    const agent = new LlmAgent({
-        name: "task-extractor",
-        model: GEMINI_MODEL,
-    });
-
     try {
-        const prompt = `
-            You are a direct task extractor.
-            Convert the following daily plan into a flat list of concise, actionable tasks.
-            Do not provide a summary.
-            Do not provide headers like "TASKS:".
-            Just list the tasks, one per line, starting with a dash "- ".
+        const agent = createTaskExtractorAgent();
 
-            PLAN CONTENT:
-            ${content}
-            `;
+        const prompt = `
+Convert the following daily plan into a flat list of concise, actionable tasks.
+Do not provide a summary.
+Do not provide headers like "TASKS:".
+Just list the tasks, one per line, starting with a dash "- ".
+
+PLAN CONTENT:
+${content}
+        `.trim();
 
         const response = await agent.generate(prompt);
-        const text = response.text || response.content || ""; // Handling potential response structures
+        const text = response.text || response.content || "";
 
         if (!text) throw new Error('Failed to generate plan refinement')
 
-        // Direct parsing: just split by newline and filter
-        const summary = "Plan converted to tasks."
         const tasks = text.trim()
 
         return {
             success: true,
             content: text.trim(),
-            summary,
+            summary: "Plan converted to tasks.",
             tasks
         }
     } catch (error: any) {
         console.error('AI Refinement failed:', error)
-        // Return the REAL error message for debugging
         return { success: false, error: `AI Error: ${error.message || error}` }
     }
 }
