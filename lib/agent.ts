@@ -53,12 +53,12 @@ export function createTaskExtractorAgent() {
                 });
 
                 // Handle response structure for @google/genai
-                // It might be response.text() or digging into candidates
-                const candidate = response.response?.candidates?.[0];
+                // candidates are directly on the response object
+                const candidate = response.candidates?.[0];
                 const textPart = candidate?.content?.parts?.[0]?.text;
 
-                // Support result.text() if it exists as a function or property
-                const text = typeof response.text === 'function' ? response.text() : (textPart || "");
+                // Support result.text if it exists as a property or function
+                const text = response.text || textPart || "";
 
                 return { text };
             } catch (e: any) {
