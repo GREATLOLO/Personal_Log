@@ -388,17 +388,13 @@ export default function Workspace({ initialRoom, currentUser, todayLog }: Worksp
                                             key={task.id}
                                             task={task as any}
                                             currentUserId={currentUser.id}
+                                            date={currentDate}
                                         />
                                     ))
                                 )}
                             </div>
                         </div>
 
-                        {/* Session Activity */}
-                        <div className="pt-8 border-t border-white/5">
-                            <h3 className="text-sm font-bold text-zinc-500 mb-6 uppercase tracking-widest text-center">Session Activity</h3>
-                            <LogView users={todayLog} roomId={initialRoom.id} />
-                        </div>
                     </div>
                 )}
 
@@ -410,26 +406,6 @@ export default function Workspace({ initialRoom, currentUser, todayLog }: Worksp
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center mb-6">
                                     <h2 className="text-xl font-bold text-white">Past Logs</h2>
-                                    <div className="flex items-center gap-3">
-                                        <button
-                                            onClick={handleAdvanceDay}
-                                            disabled={isAdvancing}
-                                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-500/10 hover:bg-violet-500/20 text-violet-400 border border-violet-500/30 transition-all text-sm font-medium"
-                                            title="Simulate Next Day"
-                                        >
-                                            <RefreshCw className={clsx("w-4 h-4", isAdvancing && "animate-spin")} />
-                                            Next Day
-                                        </button>
-                                        <button
-                                            onClick={handleDeleteHistory}
-                                            disabled={isDeleting}
-                                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 transition-all text-sm font-medium"
-                                            title="Clear All History"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                            Delete History
-                                        </button>
-                                    </div>
                                 </div>
                                 {historyDates.length === 0 ? (
                                     <div className="text-center py-20 text-zinc-500 glass-card rounded-2xl">

@@ -23,7 +23,50 @@ export async function getEffectiveToday() {
 export async function advanceDay() {
     const cookieStore = await cookies()
     const currentOffset = parseInt(cookieStore.get('dateOffset')?.value || '0')
-    cookieStore.set('dateOffset', (currentOffset + 1).toString())
+    const userId = cookieStore.get('userId')?.value
+    const roomId = cookieStore.get('roomId')?.value
+
+    const nextOffset = currentOffset + 1
+    cookieStore.set('dateOffset', nextOffset.toString())
+
+    // Convert next day's plan to tasks logic (if user and room exist)
+    if (userId && roomId) {
+        // Calculate new date
+        const date = new Date()
+        date.setDate(date.getDate() + nextOffset)
+        const dateStr = format(date, 'yyyy-MM-dd')
+
+        // Fetch plan
+        const plan = await prisma.dailyPlan.findUnique({
+            where: { userId_date: { userId, date: dateStr } }
+        })
+
+        if (plan && plan.content) {
+            // Delete existing tasks for clean slate (as per "replace" request)
+            await prisma.task.deleteMany({
+                where: { roomId }
+            })
+
+            // Parse bullets (lines starting with - or *)
+            const tasks = plan.content
+                .split('\n')
+                .map(line => line.trim())
+                .filter(line => line.startsWith('-') || line.startsWith('*'))
+                .map(line => line.substring(1).trim())
+                .filter(Boolean)
+
+            // Create new tasks
+            if (tasks.length > 0) {
+                await prisma.task.createMany({
+                    data: tasks.map(content => ({
+                        content,
+                        roomId
+                    }))
+                })
+            }
+        }
+    }
+
     revalidatePath('/')
 }
 
@@ -351,7 +394,7 @@ export async function refinePlanWithAI(content: string) {
     // Configure the Google provider to use Vercel AI Gateway
     const google = createGoogleGenerativeAI({
         apiKey,
-        baseURL: 'https://ai-gateway.vercel.sh/v1/keqing/personal-log',
+        baseURL: 'https://ai-gateway.vercel.sh/v1/keqing/personal-log/google-generative-ai',
     })
 
     try {

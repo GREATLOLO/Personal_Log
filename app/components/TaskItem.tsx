@@ -1,6 +1,5 @@
 'use client'
 
-import { format } from 'date-fns'
 import { Check, Trash2 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
@@ -26,12 +25,14 @@ interface TaskItemProps {
     task: TaskWithCompletions
     currentUserId: string
     onDelete?: (id: string) => void
+    date: string
 }
 
-export function TaskItem({ task, currentUserId }: TaskItemProps) {
+export function TaskItem({ task, currentUserId, date }: TaskItemProps) {
     const [isPending, startTransition] = useTransition()
 
-    const today = format(new Date(), 'yyyy-MM-dd')
+    // Use the passed date (effective today) instead of system date
+    const today = date
 
     const myCompletion = task.completions.find(
         c => c.userId === currentUserId && c.date === today
