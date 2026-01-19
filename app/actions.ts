@@ -42,9 +42,12 @@ export async function advanceDay() {
         })
 
         if (plan && plan.content) {
-            // Delete existing tasks for clean slate (as per "replace" request)
+            // Only delete tasks that have NO completions (preserve history)
             await prisma.task.deleteMany({
-                where: { roomId }
+                where: {
+                    roomId,
+                    completions: { none: {} }
+                }
             })
 
             // Parse bullets (lines starting with - or *)
