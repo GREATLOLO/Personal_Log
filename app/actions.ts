@@ -411,8 +411,8 @@ export async function refinePlanWithAI(content: string) {
 
     // Configure the Google provider with ADK
     const agent = new LlmAgent({
+        name: "task-extractor",
         model: GEMINI_MODEL,
-        apiKey: apiKey
     });
 
     try {
