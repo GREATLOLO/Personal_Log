@@ -397,8 +397,11 @@ export async function deleteHistory(userId: string, roomId: string) {
 }
 
 // --- Vercel AI SDK & AI Gateway integration ---
-import { createGoogleGenerativeAI } from '@ai-sdk/google'
-import { generateText } from 'ai'
+// import { createGoogleGenerativeAI } from '@ai-sdk/google'
+// import { generateText } from 'ai'
+import { LlmAgent } from "@google/adk";
+
+const GEMINI_MODEL = "gemini-2.5-flash";
 
 export async function refinePlanWithAI(content: string) {
     const apiKey = process.env.GOOGLE_GENAI_API_KEY
@@ -406,19 +409,14 @@ export async function refinePlanWithAI(content: string) {
         return { success: false, error: 'Gemini API Key missing (GOOGLE_GENAI_API_KEY)' }
     }
 
-    // Configure the Google provider
-    // Note: Removed Vercel AI Gateway baseURL to prevent 404s if slug is incorrect.
-    // Falls back to direct Google Generative AI API.
-    const google = createGoogleGenerativeAI({
-        apiKey,
-    })
+    // Configure the Google provider with ADK
+    const agent = new LlmAgent({
+        model: GEMINI_MODEL,
+        apiKey: apiKey
+    });
 
     try {
-        // User requested "gemini-2.5-flash-lite", assuming they meant 1.5-flash or similar.
-        // Using 1.5-flash as the safe default.
-        const { text } = await generateText({
-            model: google('gemini-1.5-flash'),
-            prompt: `
+        const prompt = `
             You are a direct task extractor.
             Convert the following daily plan into a flat list of concise, actionable tasks.
             Do not provide a summary.
@@ -427,8 +425,10 @@ export async function refinePlanWithAI(content: string) {
 
             PLAN CONTENT:
             ${content}
-            `,
-        })
+            `;
+
+        const response = await agent.generate(prompt);
+        const text = response.text || response.content || ""; // Handling potential response structures
 
         if (!text) throw new Error('Failed to generate plan refinement')
 
