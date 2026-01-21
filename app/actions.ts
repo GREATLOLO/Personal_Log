@@ -177,14 +177,16 @@ export async function getRoomData(roomCode: string) {
     return room
 }
 
-export async function createTask(content: string, roomId: string) {
+export async function createTask(content: string, roomId: string, scheduledTime?: string | null) {
     await prisma.task.create({
         data: {
             content,
             roomId,
+            scheduledTime: scheduledTime || null,
         }
     })
     revalidatePath(`/room/[roomCode]`) // Note: dynamic path revalidation limitation
+    revalidatePath('/') // Also revalidate home
 }
 
 export async function deleteTask(taskId: string) {
@@ -402,7 +404,7 @@ export async function deleteHistory(userId: string, roomId: string) {
 // --- Vercel AI SDK & AI Gateway integration ---
 // import { createGoogleGenerativeAI } from '@ai-sdk/google'
 // import { generateText } from 'ai'
-import { createTaskExtractorAgent } from "@/lib/agent";
+import { createTaskExtractorAgent, createTimeExtractorAgent } from "@/lib/agent";
 
 export async function refinePlanWithAI(content: string) {
     const apiKey = process.env.GOOGLE_GENAI_API_KEY
@@ -440,4 +442,47 @@ ${content}
         console.error('AI Refinement failed:', error)
         return { success: false, error: `AI Error: ${error.message || error}` }
     }
+}
+
+export async function extractTimeFromTask(content: string) {
+    const apiKey = process.env.GOOGLE_GENAI_API_KEY
+    if (!apiKey) {
+        return { success: false, error: 'Gemini API Key missing', cleanedContent: content, scheduledTime: null }
+    }
+
+    try {
+        const agent = createTimeExtractorAgent();
+        const prompt = `Extract time from this task: "${content}"`;
+
+        const response = await agent.generate(prompt);
+        const text = (response.text || "").trim();
+
+        // Parse JSON response
+        let result;
+        try {
+            // Remove markdown code blocks if present
+            const cleanText = text.replace(/```json\n?|\n?```/g, '').trim();
+            result = JSON.parse(cleanText);
+        } catch (parseError) {
+            console.error('Failed to parse AI response:', text);
+            return { success: false, error: 'Failed to parse time', cleanedContent: content, scheduledTime: null }
+        }
+
+        return {
+            success: true,
+            cleanedContent: result.cleanedContent || content,
+            scheduledTime: result.scheduledTime || null
+        }
+    } catch (error: any) {
+        console.error('Time extraction failed:', error)
+        return { success: false, error: error.message, cleanedContent: content, scheduledTime: null }
+    }
+}
+
+export async function updateTaskTime(taskId: string, scheduledTime: string | null) {
+    await prisma.task.update({
+        where: { id: taskId },
+        data: { scheduledTime }
+    })
+    revalidatePath('/')
 }

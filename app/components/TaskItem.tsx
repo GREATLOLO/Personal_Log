@@ -1,6 +1,6 @@
 'use client'
 
-import { Check, Trash2 } from 'lucide-react'
+import { Check, Trash2, Clock } from 'lucide-react'
 import { clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import { toggleTaskCompletion, deleteTask } from '@/app/actions'
@@ -18,6 +18,7 @@ type Completion = {
 type TaskWithCompletions = {
     id: string
     content: string
+    scheduledTime?: string | null
     completions: Completion[]
 }
 
@@ -90,12 +91,22 @@ export function TaskItem({ task, currentUserId, date }: TaskItemProps) {
                     {isCompletedByMe && <Check className="w-4 h-4 text-white" />}
                 </button>
 
-                <span className={clsx(
-                    "text-lg font-medium transition-all duration-300",
-                    isCompletedByMe ? "text-zinc-500 line-through" : "text-zinc-100"
-                )}>
-                    {task.content}
-                </span>
+                <div className="flex-1 min-w-0">
+                    <span className={clsx(
+                        "text-lg font-medium transition-all duration-300 block",
+                        isCompletedByMe ? "text-zinc-500 line-through" : "text-zinc-100"
+                    )}>
+                        {task.content}
+                    </span>
+                    {task.scheduledTime && (
+                        <div className="flex items-center gap-1.5 mt-1.5">
+                            <Clock className="w-3.5 h-3.5 text-primary/70" />
+                            <span className="text-xs text-primary/90 font-semibold px-2 py-0.5 rounded-md bg-primary/10 border border-primary/20">
+                                {task.scheduledTime}
+                            </span>
+                        </div>
+                    )}
+                </div>
             </div>
 
             <div className="flex items-center gap-3">

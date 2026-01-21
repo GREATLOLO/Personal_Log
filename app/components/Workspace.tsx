@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { TaskItem } from './TaskItem'
 import { LogView } from './LogView'
+import { TimelineView } from './TimelineView'
 import {
     createTask,
     getHistoryDates,
@@ -16,9 +17,10 @@ import {
     getEffectiveToday,
     resetDateOffset,
     getAllHistory,
-    refinePlanWithAI
+    refinePlanWithAI,
+    extractTimeFromTask
 } from '@/app/actions'
-import { Plus, Notebook, ListTodo, History, ArrowLeft, LogOut, CalendarPlus, Target, Trash2, RefreshCw, Sparkles, ListChecks, Check } from 'lucide-react'
+import { Plus, Notebook, ListTodo, History, ArrowLeft, LogOut, CalendarPlus, Target, Trash2, RefreshCw, Sparkles, ListChecks, Check, Clock } from 'lucide-react'
 import { clsx } from 'clsx'
 import { format, addDays, parseISO } from 'date-fns'
 
@@ -38,6 +40,7 @@ type Completion = {
 type Task = {
     id: string
     content: string
+    scheduledTime?: string | null
     completions: Completion[]
 }
 
@@ -60,7 +63,7 @@ interface WorkspaceProps {
 
 export default function Workspace({ initialRoom, currentUser, todayLog }: WorkspaceProps) {
     const router = useRouter()
-    const [activeTab, setActiveTab] = useState<'tasks' | 'log' | 'history' | 'plan'>('tasks')
+    const [activeTab, setActiveTab] = useState<'tasks' | 'log' | 'timeline' | 'history' | 'plan'>('tasks')
     const [newTaskContent, setNewTaskContent] = useState('')
     const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -164,9 +167,23 @@ export default function Workspace({ initialRoom, currentUser, todayLog }: Worksp
         if (!newTaskContent.trim() || isSubmitting) return
 
         setIsSubmitting(true)
-        await createTask(newTaskContent, initialRoom.id)
-        setNewTaskContent('')
-        setIsSubmitting(false)
+        try {
+            // Extract time from task content using AI
+            const extraction = await extractTimeFromTask(newTaskContent)
+
+            // Create task with extracted time
+            await createTask(
+                extraction.cleanedContent || newTaskContent,
+                initialRoom.id,
+                extraction.scheduledTime
+            )
+
+            setNewTaskContent('')
+        } catch (error) {
+            console.error('Failed to create task:', error)
+        } finally {
+            setIsSubmitting(false)
+        }
     }
 
     const loadHistoryLog = async (date: string) => {
@@ -252,6 +269,16 @@ export default function Workspace({ initialRoom, currentUser, todayLog }: Worksp
                         >
                             <Notebook className="w-4 h-4" />
                             Today
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('timeline')}
+                            className={clsx(
+                                "px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 flex items-center gap-2 whitespace-nowrap",
+                                activeTab === 'timeline' ? "bg-primary text-white shadow-lg" : "text-zinc-400 hover:text-white"
+                            )}
+                        >
+                            <Clock className="w-4 h-4" />
+                            Timeline
                         </button>
                         <button
                             onClick={() => setActiveTab('history')}
@@ -398,6 +425,16 @@ export default function Workspace({ initialRoom, currentUser, todayLog }: Worksp
                     </div>
                 )}
 
+
+                {activeTab === 'timeline' && (
+                    <div className="max-w-3xl mx-auto">
+                        <TimelineView
+                            tasks={initialRoom.tasks as any}
+                            currentUserId={currentUser.id}
+                            date={currentDate}
+                        />
+                    </div>
+                )}
 
                 {activeTab === 'history' && (
                     <div>

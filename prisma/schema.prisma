@@ -47,6 +47,7 @@ model Task {
   roomId      String
   room        Room         @relation(fields: [roomId], references: [id], onDelete: Cascade)
   isGlobal    Boolean      @default(true)
+  scheduledTime String?    // e.g. "09:00", "Morning", "2pm"
   completions Completion[]
   createdAt   DateTime     @default(now())
 }

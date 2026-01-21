@@ -68,3 +68,66 @@ export function createTaskExtractorAgent() {
         }
     } as any;
 }
+
+const TIME_EXTRACTION_INSTRUCTION = `
+You are a time extraction specialist.
+Extract time information from task descriptions and return ONLY a JSON object.
+
+Rules:
+1. Extract any time mentioned in the task (e.g., "9am", "14:30", "2-3pm", "morning", "evening")
+2. Normalize times to 24-hour format when possible (e.g., "9am" → "09:00", "2pm" → "14:00")
+3. Keep relative times as-is (e.g., "morning", "afternoon", "evening", "night")
+4. For time ranges, use the start time (e.g., "2-3pm" → "14:00")
+5. Remove the time from the task description to get clean content
+6. If no time found, return null for scheduledTime
+
+Return ONLY valid JSON in this exact format:
+{
+  "cleanedContent": "task description without time",
+  "scheduledTime": "HH:MM" or "morning/afternoon/evening/night" or null
+}
+
+Do not include any other text, explanation, or markdown formatting.
+`.trim();
+
+export function createTimeExtractorAgent() {
+    const modelName = "gemini-2.5-flash-lite";
+
+    const agent = new LlmAgent({
+        name: "time_extractor",
+        model: modelName,
+        description: "Extracts time information from task descriptions.",
+        instruction: TIME_EXTRACTION_INSTRUCTION,
+    });
+
+    return {
+        ...agent,
+        generate: async (prompt: string) => {
+            try {
+                const response = await genai.models.generateContent({
+                    model: modelName,
+                    config: {
+                        systemInstruction: {
+                            parts: [{ text: TIME_EXTRACTION_INSTRUCTION }]
+                        }
+                    },
+                    contents: [
+                        {
+                            role: 'user',
+                            parts: [{ text: prompt }]
+                        }
+                    ]
+                });
+
+                const candidate = response.candidates?.[0];
+                const textPart = candidate?.content?.parts?.[0]?.text;
+                const text = response.text || textPart || "";
+
+                return { text };
+            } catch (e: any) {
+                console.error("Time extraction agent failed:", e);
+                throw e;
+            }
+        }
+    } as any;
+}
