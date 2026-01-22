@@ -458,11 +458,19 @@ export default function Workspace({ initialRoom, currentUser, todayLog }: Worksp
 
                 {activeTab === 'timeline' && (
                     <div className="max-w-3xl mx-auto">
-                        <TimelineView
-                            tasks={initialRoom.tasks as any}
-                            currentUserId={currentUser.id}
-                            date={currentDate}
-                        />
+                        {loadingSchedule ? (
+                            <div className="text-center py-12 text-zinc-500">
+                                <div className="animate-spin mb-4 mx-auto w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
+                                Scheduling tasks...
+                            </div>
+                        ) : (
+                            <TimelineView
+                                tasks={initialRoom.tasks as any}
+                                currentUserId={currentUser.id}
+                                date={currentDate}
+                                daySchedule={daySchedule}
+                            />
+                        )}
                     </div>
                 )}
 

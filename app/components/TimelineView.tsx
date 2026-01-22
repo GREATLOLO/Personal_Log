@@ -4,6 +4,7 @@ import { Check, Trash2, Clock } from 'lucide-react'
 import { clsx } from 'clsx'
 import { toggleTaskCompletion, deleteTask } from '@/app/actions'
 import { useTransition } from 'react'
+import { minutesToTime, formatTimeRange, getBucketLabel, getBucketTimeRange } from '@/lib/timeUtils'
 
 type Completion = {
     id: string
@@ -23,71 +24,24 @@ interface TimelineViewProps {
     tasks: TaskWithCompletions[]
     currentUserId: string
     date: string
+    daySchedule?: any
 }
 
-// Helper function to categorize time
-function categorizeTime(scheduledTime: string | null | undefined): string {
-    if (!scheduledTime) return 'unscheduled'
-
-    const lower = scheduledTime.toLowerCase()
-
-    // Check for relative times
-    if (lower.includes('morning') || lower.includes('am')) return 'morning'
-    if (lower.includes('afternoon')) return 'afternoon'
-    if (lower.includes('evening')) return 'evening'
-    if (lower.includes('night')) return 'night'
-
-    // Parse HH:MM format
-    const match = scheduledTime.match(/(\d{1,2}):?(\d{2})?/)
-    if (match) {
-        const hour = parseInt(match[1])
-        if (hour >= 5 && hour < 12) return 'morning'
-        if (hour >= 12 && hour < 17) return 'afternoon'
-        if (hour >= 17 && hour < 21) return 'evening'
-        if (hour >= 21 || hour < 5) return 'night'
-    }
-
-    return 'unscheduled'
-}
-
-// Format time for display
-function formatTime(scheduledTime: string | null | undefined): string {
-    if (!scheduledTime) return ''
-
-    // If already a relative time, capitalize it
-    const lower = scheduledTime.toLowerCase()
-    if (['morning', 'afternoon', 'evening', 'night'].includes(lower)) {
-        return lower.charAt(0).toUpperCase() + lower.slice(1)
-    }
-
-    return scheduledTime
-}
-
-export function TimelineView({ tasks, currentUserId, date }: TimelineViewProps) {
+export function TimelineView({ tasks, currentUserId, date, daySchedule }: TimelineViewProps) {
     const [isPending, startTransition] = useTransition()
 
-    // Group tasks by time category
-    const grouped: Record<string, TaskWithCompletions[]> = {
-        morning: [],
-        afternoon: [],
-        evening: [],
-        night: [],
-        unscheduled: []
-    }
+    // If we have schedule data, use it. Otherwise fall back to old logic
+    const hasScheduleData = daySchedule?.success && daySchedule?.schedules
 
-    tasks.forEach(task => {
-        const category = categorizeTime(task.scheduledTime)
-        grouped[category].push(task)
-    })
-
-    // Sort tasks within each group by time
-    Object.keys(grouped).forEach(key => {
-        grouped[key].sort((a, b) => {
-            if (!a.scheduledTime) return 1
-            if (!b.scheduledTime) return -1
-            return a.scheduledTime.localeCompare(b.scheduledTime)
-        })
-    })
+    const grouped: Record<string, any[]> = hasScheduleData
+        ? daySchedule.schedules
+        : {
+            MORNING: [],
+            AFTERNOON: [],
+            EVENING: [],
+            NIGHT: [],
+            UNSCHEDULED: tasks
+        }
 
     const handleToggle = (taskId: string, isCompleted: boolean) => {
         startTransition(async () => {
@@ -103,14 +57,19 @@ export function TimelineView({ tasks, currentUserId, date }: TimelineViewProps) 
         }
     }
 
-    const renderTask = (task: TaskWithCompletions) => {
-        const myCompletion = task.completions.find(
-            c => c.userId === currentUserId && c.date === date
+    const renderScheduledTask = (scheduleItem: any) => {
+        const task = scheduleItem.task
+        const myCompletion = task.completions?.find(
+            (c: any) => c.userId === currentUserId && c.date === date
         )
         const isCompletedByMe = !!myCompletion
-        const otherCompletions = task.completions.filter(
-            c => c.userId !== currentUserId && c.date === date
-        )
+        const otherCompletions = task.completions?.filter(
+            (c: any) => c.userId !== currentUserId && c.date === date
+        ) || []
+
+        const timeDisplay = scheduleItem.startMinute !== null && scheduleItem.endMinute !== null
+            ? formatTimeRange(scheduleItem.startMinute, scheduleItem.endMinute)
+            : null
 
         return (
             <div
@@ -142,12 +101,17 @@ export function TimelineView({ tasks, currentUserId, date }: TimelineViewProps) 
                         )}>
                             {task.content}
                         </span>
-                        {task.scheduledTime && (
+                        {timeDisplay && (
                             <div className="flex items-center gap-1 mt-1">
                                 <Clock className="w-3 h-3 text-primary/60" />
                                 <span className="text-xs text-primary/80 font-medium">
-                                    {formatTime(task.scheduledTime)}
+                                    {timeDisplay}
                                 </span>
+                                {scheduleItem.source === 'AI' && scheduleItem.confidence && (
+                                    <span className="text-xs text-zinc-600" title={`Confidence: ${(scheduleItem.confidence * 100).toFixed(0)}%`}>
+                                        ({(scheduleItem.confidence * 100).toFixed(0)}%)
+                                    </span>
+                                )}
                             </div>
                         )}
                     </div>
@@ -155,7 +119,7 @@ export function TimelineView({ tasks, currentUserId, date }: TimelineViewProps) 
 
                 <div className="flex items-center gap-2">
                     <div className="flex -space-x-2">
-                        {otherCompletions.map(c => (
+                        {otherCompletions.map((c: any) => (
                             <div
                                 key={c.id}
                                 title={`Completed by ${c.user.name}`}
@@ -178,10 +142,10 @@ export function TimelineView({ tasks, currentUserId, date }: TimelineViewProps) 
     }
 
     const timeBlocks = [
-        { key: 'morning', label: '🌅 Morning', icon: '☀️', gradient: 'from-yellow-500/20 to-orange-500/20' },
-        { key: 'afternoon', label: '🌤️ Afternoon', icon: '🌞', gradient: 'from-orange-500/20 to-red-500/20' },
-        { key: 'evening', label: '🌆 Evening', icon: '🌙', gradient: 'from-purple-500/20 to-blue-500/20' },
-        { key: 'night', label: '🌙 Night', icon: '✨', gradient: 'from-blue-900/20 to-indigo-900/20' },
+        { key: 'MORNING', label: '🌅 Morning', timeRange: '06:00-12:00', gradient: 'from-yellow-500/20 to-orange-500/20' },
+        { key: 'AFTERNOON', label: '🌤️ Afternoon', timeRange: '12:00-17:00', gradient: 'from-orange-500/20 to-red-500/20' },
+        { key: 'EVENING', label: '🌆 Evening', timeRange: '17:00-21:00', gradient: 'from-purple-500/20 to-blue-500/20' },
+        { key: 'NIGHT', label: '🌙 Night', timeRange: '21:00-06:00', gradient: 'from-blue-900/20 to-indigo-900/20' },
     ]
 
     return (
@@ -189,35 +153,37 @@ export function TimelineView({ tasks, currentUserId, date }: TimelineViewProps) 
             {/* Timeline Blocks */}
             {timeBlocks.map(block => (
                 <div key={block.key} className="glass-card p-5 rounded-2xl">
-                    <div className="flex items-center gap-2 mb-4">
-                        <div className={clsx(
-                            "w-10 h-10 rounded-xl bg-gradient-to-br flex items-center justify-center text-lg",
-                            block.gradient
-                        )}>
-                            {block.icon}
-                        </div>
-                        <div>
-                            <h3 className="text-lg font-bold text-white">{block.label}</h3>
-                            <p className="text-xs text-zinc-500">
-                                {grouped[block.key].length} task{grouped[block.key].length !== 1 ? 's' : ''}
-                            </p>
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                            <div className={clsx(
+                                "w-10 h-10 rounded-xl bg-gradient-to-br flex items-center justify-center text-lg",
+                                block.gradient
+                            )}>
+                                {block.label.split(' ')[0]}
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-white">{block.label}</h3>
+                                <p className="text-xs text-zinc-500">
+                                    {block.timeRange} • {grouped[block.key]?.length || 0} task{grouped[block.key]?.length !== 1 ? 's' : ''}
+                                </p>
+                            </div>
                         </div>
                     </div>
 
-                    {grouped[block.key].length === 0 ? (
+                    {!grouped[block.key] || grouped[block.key].length === 0 ? (
                         <div className="text-center py-6 text-zinc-600 text-sm">
                             No tasks scheduled
                         </div>
                     ) : (
                         <div className="space-y-0">
-                            {grouped[block.key].map(renderTask)}
+                            {grouped[block.key].map(renderScheduledTask)}
                         </div>
                     )}
                 </div>
             ))}
 
             {/* Unscheduled Section */}
-            {grouped.unscheduled.length > 0 && (
+            {grouped.UNSCHEDULED && grouped.UNSCHEDULED.length > 0 && (
                 <div className="glass-card p-5 rounded-2xl border-2 border-dashed border-zinc-700/50">
                     <div className="flex items-center gap-2 mb-4">
                         <div className="w-10 h-10 rounded-xl bg-zinc-800/50 flex items-center justify-center text-lg">
@@ -226,14 +192,22 @@ export function TimelineView({ tasks, currentUserId, date }: TimelineViewProps) 
                         <div>
                             <h3 className="text-lg font-bold text-white">Unscheduled</h3>
                             <p className="text-xs text-zinc-500">
-                                {grouped.unscheduled.length} task{grouped.unscheduled.length !== 1 ? 's' : ''}
+                                {grouped.UNSCHEDULED.length} task{grouped.UNSCHEDULED.length !== 1 ? 's' : ''}
                             </p>
                         </div>
                     </div>
 
                     <div className="space-y-0">
-                        {grouped.unscheduled.map(renderTask)}
+                        {grouped.UNSCHEDULED.map(renderScheduledTask)}
                     </div>
+                </div>
+            )}
+
+            {!hasScheduleData && (
+                <div className="text-center py-8 px-4 glass-card rounded-xl">
+                    <p className="text-zinc-500 text-sm">
+                        💡 Tasks will be automatically scheduled when you navigate to a date
+                    </p>
                 </div>
             )}
         </div>
