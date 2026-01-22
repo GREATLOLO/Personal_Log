@@ -404,7 +404,8 @@ export async function deleteHistory(userId: string, roomId: string) {
 // --- Vercel AI SDK & AI Gateway integration ---
 // import { createGoogleGenerativeAI } from '@ai-sdk/google'
 // import { generateText } from 'ai'
-import { createTaskExtractorAgent, createTimeExtractorAgent } from "@/lib/agent";
+import { createTaskExtractorAgent, createTimeExtractorAgent, createDaySchedulerAgent } from "@/lib/agent";
+import { getBucket, roundToQuarterHour, resolveConflicts } from "@/lib/timeUtils";
 
 export async function refinePlanWithAI(content: string) {
     const apiKey = process.env.GOOGLE_GENAI_API_KEY
@@ -486,3 +487,194 @@ export async function updateTaskTime(taskId: string, scheduledTime: string | nul
     })
     revalidatePath('/')
 }
+
+// --- Task Scheduling System ---
+
+export async function scheduleDayTasks(roomId: string, date: string) {
+    const apiKey = process.env.GOOGLE_GENAI_API_KEY
+    if (!apiKey) {
+        return { success: false, error: 'Gemini API Key missing' }
+    }
+
+    try {
+        // Fetch all tasks for the room
+        const tasks = await prisma.task.findMany({
+            where: { roomId },
+            select: { id: true, content: true }
+        })
+
+        if (tasks.length === 0) {
+            return { success: true, scheduled: 0, unscheduled: 0 }
+        }
+
+        // Call AI agent for batch scheduling
+        const agent = createDaySchedulerAgent()
+        const prompt = JSON.stringify({
+            date,
+            timezone: 'America/Los_Angeles',
+            tasks: tasks.map(t => ({ taskId: t.id, text: t.content }))
+        })
+
+        const response = await agent.generate(prompt)
+        const text = (response.text || '').trim()
+
+        // Parse JSON response
+        let result
+        try {
+            const cleanText = text.replace(/```json\n?|\n?```/g, '').trim()
+            result = JSON.parse(cleanText)
+        } catch (parseError) {
+            console.error('Failed to parse AI schedule response:', text)
+            return { success: false, error: 'Failed to parse AI response' }
+        }
+
+        if (!result.schedules || !Array.isArray(result.schedules)) {
+            return { success: false, error: 'Invalid AI response format' }
+        }
+
+        // Apply conflict resolution
+        const withTimes = result.schedules.filter((s: any) => s.startMinute !== null)
+        const adjusted = resolveConflicts(
+            withTimes.map((s: any) => ({
+                id: s.taskId,
+                startMinute: roundToQuarterHour(s.startMinute),
+                endMinute: roundToQuarterHour(s.endMinute),
+                confidence: s.confidence
+            }))
+        )
+
+        // Create a map of adjusted times
+        const adjustedMap = new Map(adjusted.map(a => [a.id, a]))
+
+        // Upsert schedules
+        let scheduled = 0
+        let unscheduled = 0
+
+        for (const schedule of result.schedules) {
+            const adjustedData = adjustedMap.get(schedule.taskId)
+            const finalStartMinute = adjustedData?.startMinute ?? schedule.startMinute
+            const finalEndMinute = adjustedData?.endMinute ?? schedule.endMinute
+            const bucket = schedule.bucket || getBucket(finalStartMinute)
+
+            await prisma.taskSchedule.upsert({
+                where: {
+                    roomId_taskId_date: {
+                        roomId,
+                        taskId: schedule.taskId,
+                        date
+                    }
+                },
+                update: {
+                    startMinute: finalStartMinute,
+                    endMinute: finalEndMinute,
+                    bucket,
+                    confidence: schedule.confidence,
+                    source: 'AI'
+                },
+                create: {
+                    roomId,
+                    taskId: schedule.taskId,
+                    date,
+                    startMinute: finalStartMinute,
+                    endMinute: finalEndMinute,
+                    bucket,
+                    confidence: schedule.confidence,
+                    source: 'AI'
+                }
+            })
+
+            if (bucket === 'UNSCHEDULED') {
+                unscheduled++
+            } else {
+                scheduled++
+            }
+        }
+
+        revalidatePath('/')
+        return { success: true, scheduled, unscheduled }
+    } catch (error: any) {
+        console.error('Day scheduling failed:', error)
+        return { success: false, error: error.message }
+    }
+}
+
+export async function getDaySchedule(roomId: string, date: string) {
+    try {
+        const schedules = await prisma.taskSchedule.findMany({
+            where: { roomId, date },
+            include: {
+                task: {
+                    include: {
+                        completions: {
+                            where: { date },
+                            include: {
+                                user: true
+                            }
+                        }
+                    }
+                }
+            },
+            orderBy: [
+                { startMinute: 'asc' }
+            ]
+        })
+
+        // Group by bucket
+        const grouped: Record<string, any[]> = {
+            MORNING: [],
+            AFTERNOON: [],
+            EVENING: [],
+            NIGHT: [],
+            UNSCHEDULED: []
+        }
+
+        schedules.forEach(schedule => {
+            grouped[schedule.bucket].push({
+                ...schedule,
+                task: schedule.task
+            })
+        })
+
+        return { success: true, schedules: grouped, raw: schedules }
+    } catch (error: any) {
+        console.error('Failed to get day schedule:', error)
+        return { success: false, error: error.message }
+    }
+}
+
+export async function updateTaskSchedule(scheduleId: string, startMinute: number, endMinute: number) {
+    try {
+        const bucket = getBucket(startMinute)
+
+        await prisma.taskSchedule.update({
+            where: { id: scheduleId },
+            data: {
+                startMinute,
+                endMinute,
+                bucket,
+                source: 'USER'
+            }
+        })
+
+        revalidatePath('/')
+        return { success: true }
+    } catch (error: any) {
+        console.error('Failed to update schedule:', error)
+        return { success: false, error: error.message }
+    }
+}
+
+export async function clearDaySchedule(roomId: string, date: string) {
+    try {
+        await prisma.taskSchedule.deleteMany({
+            where: { roomId, date }
+        })
+
+        revalidatePath('/')
+        return { success: true }
+    } catch (error: any) {
+        console.error('Failed to clear schedule:', error)
+        return { success: false, error: error.message }
+    }
+}
+

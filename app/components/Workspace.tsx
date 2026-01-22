@@ -18,7 +18,9 @@ import {
     resetDateOffset,
     getAllHistory,
     refinePlanWithAI,
-    extractTimeFromTask
+    extractTimeFromTask,
+    scheduleDayTasks,
+    getDaySchedule
 } from '@/app/actions'
 import { Plus, Notebook, ListTodo, History, ArrowLeft, LogOut, CalendarPlus, Target, Trash2, RefreshCw, Sparkles, ListChecks, Check, Clock } from 'lucide-react'
 import { clsx } from 'clsx'
@@ -67,6 +69,10 @@ export default function Workspace({ initialRoom, currentUser, todayLog }: Worksp
     const [newTaskContent, setNewTaskContent] = useState('')
     const [isSubmitting, setIsSubmitting] = useState(false)
 
+    // Schedule State
+    const [daySchedule, setDaySchedule] = useState<any>(null)
+    const [loadingSchedule, setLoadingSchedule] = useState(false)
+
     // History State
     const [historyDates, setHistoryDates] = useState<string[]>([])
     const [selectedHistoryDate, setSelectedHistoryDate] = useState<string | null>(null)
@@ -94,6 +100,30 @@ export default function Workspace({ initialRoom, currentUser, todayLog }: Worksp
     useEffect(() => {
         getEffectiveToday().then(setCurrentDate)
     }, [])
+
+    // Auto-schedule day when date changes
+    useEffect(() => {
+        if (currentDate && initialRoom.id) {
+            const scheduleDayIfNeeded = async () => {
+                setLoadingSchedule(true)
+                try {
+                    // Try to schedule (will be a no-op if already scheduled)
+                    await scheduleDayTasks(initialRoom.id, currentDate)
+
+                    // Fetch the schedule
+                    const scheduleResult = await getDaySchedule(initialRoom.id, currentDate)
+                    if (scheduleResult.success) {
+                        setDaySchedule(scheduleResult)
+                    }
+                } catch (error) {
+                    console.error('Failed to load schedule:', error)
+                } finally {
+                    setLoadingSchedule(false)
+                }
+            }
+            scheduleDayIfNeeded()
+        }
+    }, [currentDate, initialRoom.id])
 
     // Refresh today's target when date or completions change
     useEffect(() => {
